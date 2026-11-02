@@ -2,19 +2,7 @@
 
 Aplicativo de terminal (TUI) em Go que monta uma **fila de instalação de pacotes `.pkg` no PS4**, enviando um por vez (ou N) para o [ezRemote Client](https://github.com/cy33hc/ps4-ezremote-client) e liberando o próximo assim que o download anterior termina.
 
-```
-PS4 PKG Queue v0.1.0                                         ● NAS conectado  ·  PS4 192.168.0.104
-╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ Pasta http://192.168.0.121:8080/                                                                 │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
-╭───────────────────────────────────────────────╮╭───────────────────────────────────────────────╮
-│ Arquivos  /  1 marcado(s)                     ││ Fila  1 ativo · 1 pendente(s) · 0 concluído(s)│
-│   ▸ GOD OF WAR 1/                             ││ › ↓ Mega Man X Collection.pkg        baixando │
-│   [ ] Mega Man X Collection.pkg     baixando  ││     ████░░░░░░  41% 1.1 GB/2.7 GB · 03:12     │
-│ › [x] Tekken 5.pkg                    3.9 GB  ││   ○ Tekken 5.pkg                           #1 │
-│   [ ] Resident Evil 4.pkg             3.8 GB  ││     3.9 GB · aguardando a vez                 │
-╰───────────────────────────────────────────────╯╰───────────────────────────────────────────────╯
-```
+![Interface do ps4pkgq: pastas à esquerda, fila de instalação à direita](docs/images/screenshot.png)
 
 - **Topo:** URL da pasta HTTP com os `.pkg` (listagem do Apache).
 - **Esquerda:** navegue pelas pastas e marque os arquivos.
