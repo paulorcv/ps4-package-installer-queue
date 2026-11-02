@@ -192,6 +192,7 @@ A marcação é mantida ao navegar entre pastas, então dá para marcar arquivos
 | Topo mostra erro de `known_hosts` ou `key mismatch` | Conecte uma vez com `ssh` e aceite a chave do NAS |
 | Topo fica em "conectando ao NAS…" | Confira o IP, a porta e o usuário em `nas.ssh` e se o SSH está ativo no NAS |
 | `erro ao listar` na esquerda | Abra a `source_url` no navegador; o Apache precisa estar rodando |
+| Fila mostra "⚠ ezRemote não respondeu · nova tentativa em…" | A fila pausou sem perder itens e tenta de novo sozinha (15s, 30s… até 2min). Deixe o ezRemote aberto na tela do PS4, fora do modo repouso e sem um jogo rodando |
 | Item falha com "o PS4 não começou a baixar" | Confira se o ezRemote está aberto no PS4 e se o `ps4.host` está certo |
 | Item fica "baixando" com 0% | Confira se o access log está configurado ([docs/nas-setup.md](docs/nas-setup.md#2-configuração-do-apache)) |
 

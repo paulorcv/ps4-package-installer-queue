@@ -234,6 +234,89 @@ func TestSendFailure(t *testing.T) {
 	h.expect(Failed, Failed)
 }
 
+// timeoutErr behaves like the error net/http returns when ezRemote does not
+// answer in time.
+type timeoutErr struct{}
+
+func (timeoutErr) Error() string   { return "Client.Timeout exceeded" }
+func (timeoutErr) Timeout() bool   { return true }
+func (timeoutErr) Temporary() bool { return true }
+
+func TestUnreachableInstallerPausesInsteadOfFailing(t *testing.T) {
+	h := newHarness(t, 1)
+	h.inst.err = timeoutErr{}
+	h.eng.Add(
+		NewItem{Name: "a", URL: "http://nas/a.pkg", Size: 1},
+		NewItem{Name: "b", URL: "http://nas/b.pkg", Size: 1},
+		NewItem{Name: "c", URL: "http://nas/c.pkg", Size: 1},
+	)
+	h.step()
+	// Nothing failed, and the queue did not race through b and c.
+	h.expect(Pending, Pending, Pending)
+	if got := len(h.inst.sent()); got != 1 {
+		t.Fatalf("sent %d requests, want 1", got)
+	}
+	st := h.eng.Status()
+	if st.RetryAt.IsZero() || st.LastErr == "" {
+		t.Fatalf("status = %+v, want paused", st)
+	}
+
+	// Still paused before the backoff ends.
+	h.clk.Advance(10 * time.Second)
+	h.step()
+	if got := len(h.inst.sent()); got != 1 {
+		t.Fatalf("sent while paused: %d", got)
+	}
+
+	// Second failure doubles the wait (15s -> 30s).
+	h.clk.Advance(5 * time.Second)
+	h.step()
+	if got := len(h.inst.sent()); got != 2 {
+		t.Fatalf("sent %d, want 2 after backoff", got)
+	}
+	if wait := h.eng.Status().RetryAt.Sub(h.clk.Now()); wait != 30*time.Second {
+		t.Fatalf("second backoff = %s, want 30s", wait)
+	}
+
+	// ezRemote is back: the first item goes out and the pause clears.
+	h.inst.mu.Lock()
+	h.inst.err = nil
+	h.inst.mu.Unlock()
+	h.clk.Advance(30 * time.Second)
+	h.step()
+	h.expect(Downloading, Pending, Pending)
+	if st := h.eng.Status(); !st.RetryAt.IsZero() {
+		t.Fatalf("still paused after success: %+v", st)
+	}
+	if sent := h.inst.sent(); sent[len(sent)-1] != "http://nas/a.pkg" {
+		t.Fatalf("order changed: %v", sent)
+	}
+}
+
+func TestBackoffIsCapped(t *testing.T) {
+	h := newHarness(t, 1)
+	h.eng.opts.RetryMax = 40 * time.Second
+	h.inst.err = timeoutErr{}
+	h.eng.Add(NewItem{Name: "a", URL: "http://nas/a.pkg", Size: 1})
+	for i := 0; i < 5; i++ {
+		h.step()
+		wait := h.eng.Status().RetryAt.Sub(h.clk.Now())
+		if wait > 40*time.Second {
+			t.Fatalf("backoff %s exceeds cap", wait)
+		}
+		h.clk.Advance(wait)
+	}
+}
+
+func TestIsNetworkError(t *testing.T) {
+	if !IsNetworkError(timeoutErr{}) || !IsNetworkError(context.DeadlineExceeded) {
+		t.Error("timeouts must be transient")
+	}
+	if IsNetworkError(errors.New("ezRemote recusou a instalação: Invalid URL")) {
+		t.Error("an answer from ezRemote is not a network error")
+	}
+}
+
 func TestMonitorErrorKeepsWaiting(t *testing.T) {
 	h := newHarness(t, 1)
 	h.eng.Add(NewItem{Name: "a", URL: "http://nas/a.pkg", Size: 1})

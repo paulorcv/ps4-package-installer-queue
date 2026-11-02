@@ -90,6 +90,9 @@ func run() error {
 	defer cancel()
 
 	httpClient := &http.Client{Timeout: 30 * time.Second}
+	// ezRemote only answers after reading the package header from the NAS,
+	// which can take a while for large packages.
+	ezClient := &http.Client{Timeout: 2 * time.Minute}
 
 	watcher := monitor.New(cfg.NAS.SSH, cfg.NAS.AccessLog, cfg.NAS.HTTPPort, cfg.PS4.Host)
 	go watcher.Run(ctx)
@@ -101,7 +104,8 @@ func run() error {
 		IdleDone:      cfg.Queue.IdleDone,
 		StallTimeout:  cfg.Queue.StallTimeout,
 		PollInterval:  cfg.Queue.PollInterval,
-	}, ezremote.New(cfg.PS4.Host, cfg.PS4.EzRemotePort, httpClient), watcher)
+		SendTimeout:   2 * time.Minute,
+	}, ezremote.New(cfg.PS4.Host, cfg.PS4.EzRemotePort, ezClient), watcher)
 	go engine.Run(ctx, watcher.Events())
 
 	model := ui.New(ui.Deps{

@@ -175,6 +175,11 @@ func (m Model) viewQueue(w, h int) string {
 		title += styleErr.Render(fmt.Sprintf(" · %d falha(s)", failed))
 	}
 	lines := []string{ansi.Truncate(title, cw, "…")}
+	if st := m.deps.Engine.Status(); !st.RetryAt.IsZero() {
+		wait := duration(st.RetryAt.Sub(m.now))
+		lines = append(lines, styleWarn.Render(ansi.Truncate("⚠ ezRemote não respondeu · nova tentativa em "+wait, cw, "…")))
+		rows--
+	}
 
 	if len(m.items) == 0 {
 		lines = append(lines, styleMuted.Render(wrap("fila vazia: marque arquivos à esquerda com espaço e pressione e", cw)))

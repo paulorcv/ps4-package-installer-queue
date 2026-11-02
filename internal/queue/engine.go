@@ -5,7 +5,9 @@ package queue
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net"
 	"net/url"
 	"sync"
 	"time"
@@ -91,7 +93,23 @@ type Options struct {
 	StallTimeout  time.Duration // quiet period without finishing => failed
 	PollInterval  time.Duration
 	SendTimeout   time.Duration
-	Now           func() time.Time
+	// RetryMin and RetryMax bound the backoff used while the installer is
+	// unreachable. The queue pauses instead of failing items.
+	RetryMin time.Duration
+	RetryMax time.Duration
+	// IsTransient reports whether a send error means "try again later"
+	// (e.g. the PS4 or ezRemote is not answering). Defaults to network
+	// errors and timeouts.
+	IsTransient func(error) bool
+	Now         func() time.Time
+}
+
+// Status describes the engine as a whole.
+type Status struct {
+	// RetryAt is when sending resumes after the installer was unreachable;
+	// zero when not paused.
+	RetryAt time.Time
+	LastErr string
 }
 
 // Engine owns the queue. All methods are safe for concurrent use.
@@ -104,6 +122,10 @@ type Engine struct {
 	items  []*Item
 	nextID int
 	monErr string // last monitor error, to avoid repeating it
+
+	retryAt time.Time     // sending is paused until then
+	backoff time.Duration // next pause length
+	sendErr string        // last transient send error
 
 	changed chan struct{}
 	wake    chan struct{}
@@ -121,11 +143,21 @@ func New(opts Options, inst Installer, act Activity) *Engine {
 	if opts.Now == nil {
 		opts.Now = time.Now
 	}
+	if opts.RetryMin <= 0 {
+		opts.RetryMin = 15 * time.Second
+	}
+	if opts.RetryMax < opts.RetryMin {
+		opts.RetryMax = 2 * time.Minute
+	}
+	if opts.IsTransient == nil {
+		opts.IsTransient = IsNetworkError
+	}
 	return &Engine{
 		opts:    opts,
 		inst:    inst,
 		act:     act,
 		nextID:  1,
+		backoff: opts.RetryMin,
 		changed: make(chan struct{}, 1),
 		wake:    make(chan struct{}, 1),
 		logs:    make(chan string, 256),
@@ -274,6 +306,17 @@ func (e *Engine) ClearFinished() int {
 	return removed
 }
 
+// Status reports whether sending is paused because the installer was
+// unreachable.
+func (e *Engine) Status() Status {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if !e.opts.Now().Before(e.retryAt) {
+		return Status{}
+	}
+	return Status{RetryAt: e.retryAt, LastErr: e.sendErr}
+}
+
 // Snapshot returns a copy of every item, in queue order.
 func (e *Engine) Snapshot() []Item {
 	e.mu.Lock()
@@ -316,7 +359,7 @@ func (e *Engine) Run(ctx context.Context, events <-chan monitor.Event) {
 func (e *Engine) dispatch(ctx context.Context) {
 	for {
 		e.mu.Lock()
-		if e.activeLocked() >= e.opts.MaxConcurrent {
+		if e.opts.Now().Before(e.retryAt) || e.activeLocked() >= e.opts.MaxConcurrent {
 			e.mu.Unlock()
 			return
 		}
@@ -348,23 +391,44 @@ func (e *Engine) send(ctx context.Context, id int, name, u string) {
 		return
 	}
 	now := e.opts.Now()
-	if err != nil {
+	var msg string
+	switch {
+	case err == nil:
+		it.State = Downloading
+		it.SentAt = now
+		e.retryAt, e.sendErr, e.backoff = time.Time{}, "", e.opts.RetryMin
+		msg = fmt.Sprintf("PS4 aceitou: %s", name)
+	case e.opts.IsTransient(err):
+		// Keep the item at the head of the queue and pause sending, so a
+		// short outage does not fail the whole queue.
+		wait := e.backoff
+		it.State = Pending
+		it.SentAt = time.Time{}
+		e.retryAt = now.Add(wait)
+		e.sendErr = err.Error()
+		e.backoff = min(e.backoff*2, e.opts.RetryMax)
+		msg = fmt.Sprintf("ezRemote não respondeu (%v); nova tentativa em %s", err, wait)
+	default:
 		it.State = Failed
 		it.Err = err.Error()
 		it.FinishedAt = now
-	} else {
-		it.State = Downloading
-		it.SentAt = now
+		msg = fmt.Sprintf("falha ao enviar %s: %v", name, err)
 	}
 	e.notifyLocked()
 	e.mu.Unlock()
 
-	if err != nil {
-		e.log("falha ao enviar %s: %v", name, err)
-	} else {
-		e.log("PS4 aceitou: %s", name)
-	}
+	e.log("%s", msg)
 	e.kick()
+}
+
+// IsNetworkError reports whether err is a connection problem or timeout, as
+// opposed to an answer from the installer.
+func IsNetworkError(err error) bool {
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	var ne net.Error
+	return errors.As(err, &ne)
 }
 
 // OnEvent accounts for a request the NAS served.
