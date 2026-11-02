@@ -16,3 +16,4 @@ config.yaml
 *.swp
 .DS_Store
 Thumbs.db
+*.exe~
