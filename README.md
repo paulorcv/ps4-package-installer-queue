@@ -218,8 +218,10 @@ internal/ezremote/  cliente da API do ezRemote
 internal/monitor/   SSH no NAS: tail do access log e /proc/net/tcp
 internal/queue/     motor da fila e regras de conclusão
 internal/ui/        interface Bubble Tea
-docs/               configuração do NAS
+docs/               contexto do projeto, decisões (ADR) e configuração do NAS
 ```
+
+O estado atual, o ambiente e os próximos passos estão em [docs/context.md](docs/context.md). As decisões técnicas, com o porquê de cada uma, estão em [docs/adr/](docs/adr/README.md).
 
 ## Limitações conhecidas
 
