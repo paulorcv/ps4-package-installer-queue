@@ -2,6 +2,7 @@
 #
 # Local padrão:
 #   Windows: %AppData%\ps4pkgq\config.yaml
+#   macOS:   ~/Library/Application Support/ps4pkgq/config.yaml
 #   Linux:   ~/.config/ps4pkgq/config.yaml
 #
 # Gere este arquivo com:  ps4pkgq -init

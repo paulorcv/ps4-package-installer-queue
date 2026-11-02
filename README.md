@@ -105,9 +105,31 @@ $env:PS4PKGQ_SSH_PASSWORD = "sua-senha"
 
 Para usar: navegue com as setas, abra pastas com `enter`, marque com `espaço` e aperte `e` para enfileirar. O `tab` troca de painel, o `?` mostra todos os atalhos e o `q` sai.
 
+### No macOS
+
+O `make` e o `git` vêm com as Command Line Tools da Apple. O Go pode ser instalado pelo Homebrew ou pelo instalador do [go.dev/dl](https://go.dev/dl/).
+
+```bash
+xcode-select --install        # make e git (uma vez só)
+brew install go               # ou o instalador do go.dev
+
+git clone https://github.com/paulorcv/ps4-package-installer-queue.git
+cd ps4-package-installer-queue
+make test                     # testes
+make build                    # gera dist/ps4pkgq para o seu Mac
+
+./dist/ps4pkgq -init
+open -e ~/Library/Application\ Support/ps4pkgq/config.yaml
+
+export PS4PKGQ_SSH_PASSWORD="sua-senha"
+./dist/ps4pkgq
+```
+
+Registre o NAS no `~/.ssh/known_hosts` do Mac uma vez (veja [Configuração](#configuração)). Para não exportar a senha a cada sessão, prefira uma chave SSH em `nas.ssh.key_file`.
+
 ## Configuração
 
-> **Não renomeie nem mova** o [`internal/config/config.example.yaml`](internal/config/config.example.yaml). Ele é embutido no binário e serve de modelo para o `-init`. O seu `config.yaml` fica em `%AppData%\ps4pkgq\` ou onde você indicar com `-config`.
+> **Não renomeie nem mova** o [`internal/config/config.example.yaml`](internal/config/config.example.yaml). Ele é embutido no binário e serve de modelo para o `-init`. O seu `config.yaml` fica em `%AppData%\ps4pkgq\` no Windows, `~/Library/Application Support/ps4pkgq/` no macOS e `~/.config/ps4pkgq/` no Linux, ou onde você indicar com `-config`.
 
 Para manter o config em outro lugar, como na pasta do projeto, use `.\ps4pkgq.exe -config .\config.yaml`. O `.gitignore` impede que um `config.yaml` vá para o repositório.
 
@@ -195,7 +217,7 @@ go vet ./...
 go run ./cmd/ps4pkgq -debug-log debug.log
 ```
 
-Ou com `make` (Linux/macOS/WSL): `make test`, `make build`, `make build-windows`.
+Ou com `make` (macOS, Linux ou WSL): `make test`, `make build` (binário para a máquina atual) e `make build-windows` (gera o `.exe` a partir do Mac).
 
 ### Estrutura
 
