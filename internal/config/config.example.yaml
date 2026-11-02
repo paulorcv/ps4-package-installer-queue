@@ -1,0 +1,44 @@
+# Configuração do ps4pkgq
+#
+# Local padrão:
+#   Windows: %AppData%\ps4pkgq\config.yaml
+#   Linux:   ~/.config/ps4pkgq/config.yaml
+#
+# Gere este arquivo com:  ps4pkgq -init
+
+# Pasta HTTP (listagem do Apache) aberta ao iniciar. Pode ser trocada na tela.
+source_url: http://192.168.0.121:8080/
+
+ps4:
+  # IP do PS4. Fixe-o no roteador para não mudar.
+  host: 192.168.0.104
+  # Porta da interface web do ezRemote Client.
+  ezremote_port: 8080
+
+nas:
+  ssh:
+    host: 192.168.0.121
+    port: 22
+    user: root
+    # Prefira a variável de ambiente PS4PKGQ_SSH_PASSWORD ou uma chave.
+    password: ""
+    key_file: ""            # ex.: ~/.ssh/id_rsa
+    known_hosts: ""         # padrão: ~/.ssh/known_hosts
+    # Só use true se não conseguir registrar o NAS no known_hosts.
+    insecure_ignore_host_key: false
+  # Access log do Apache no NAS (LogFormat "%h %t \"%r\" %>s %B").
+  access_log: /var/log/apache2/pkg-access.log
+  # Porta em que o Apache serve os pkgs.
+  http_port: 8080
+
+queue:
+  # Quantos downloads simultâneos no PS4.
+  max_concurrent: 1
+  # Sem nenhum sinal do PS4 depois de enviar: falha.
+  start_timeout: 3m
+  # Arquivo todo servido e sem conexões por esse tempo: concluído.
+  idle_done: 60s
+  # Sem conexões e sem terminar por esse tempo: falha.
+  stall_timeout: 15m
+  # Intervalo entre verificações no NAS.
+  poll_interval: 5s
